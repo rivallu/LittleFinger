@@ -1,7 +1,17 @@
 #!/usr/bin/env python
 #-*-coding:UTF-8-*-
 
-import os,subprocess,sys,re,json
+from scapy.all import *
+import os,subprocess,sys,re,json, argparse
+
+#####################################################################################
+# Fonction qui gère les arguments du script                                         #
+#####################################################################################
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--domain", help="Choose the victim domain. Example: -v google.fr")
+    return parser.parse_args()
+
 
 #####################################################################################
 # Fonction qui permet de chercher dans une page donnée tout les email               #
@@ -48,8 +58,10 @@ def findPhoneNumber(url):
     return phoneNumList
 
 
-    
-domain=sys.argv[1]
+
+args=parse_args()
+domain=args.domain
+
 dico={}
 print "Début de la prise d'empreinte sur",domain
 whois=subprocess.check_output(['whois',domain])
@@ -76,29 +88,38 @@ for i in range (0,len(email)):
     email[i]=email[i][0]
 email.sort()
 
-transfert=subprocess.check_output(['host','-l',domain, ip[0]])
-name=re.findall(r"(([a-z0-9]*\.)+([a-z0-9\-])+\.([a-z]){2})",transfert)
-for i in range (0,len(name)):
-    name[i]=name[i][0]
-ip=re.findall(r'(([0-9]{1,3}\.){3}[0-9]{1,3})',transfert)
-for i in range (0,len(ip)):
-    ip[i]=ip[i][0]
-for i in range (0,len(ip)):
-    dico[name[i]]=ip[i]
+#####################################################################################
+# Fonction qui effectue un transfert de zone                                        #
+# @param domain : domain a testé                                                    #
+# @return dico : le dictionaire avec toute les IP et leurs nom                      #
+#####################################################################################
+def zoneTransfert (domain):
+    transfert=subprocess.check_output(['host','-l',domain, ip[0]])
+    name=re.findall(r"(([a-z0-9]*\.)+([a-z0-9\-])+\.([a-z]){2})",transfert)
+    for i in range (0,len(name)):
+        name[i]=name[i][0]
+    ip=re.findall(r'(([0-9]{1,3}\.){3}[0-9]{1,3})',transfert)
+    for i in range (0,len(ip)):
+        ip[i]=ip[i][0]
+    for i in range (0,len(ip)):
+        dico[name[i]]=ip[i]
 
-dicotmp=dico.copy()
-for key in dico:
-    if re.search(r"192\.168\..*",dico[key]):
-        del dicotmp[key]
-        dico[key]=''
-    if re.search(r"172\.16\..*",dico[key]):
-        del dicotmp[key]
-        dico[key]=''
-dico=dicotmp
-print dico
+    dicotmp=dico.copy()
+    for key in dico:
+        if re.search(r"192\.168\..*",dico[key]):
+            del dicotmp[key]
+            dico[key]=''
+        if re.search(r"172\.16\..*",dico[key]):
+            del dicotmp[key]
+            dico[key]=''
+    dico=dicotmp
+    return dico
 
-for machine in dico:
-    if subprocess.check_output(['ping','-c','1',dico[machine]]):
-        print dico[machine],'is up'
-    else:
-        print dico[machine], 'is off'
+#Fonction qui regarde si une IP est up
+def checkIsUp(listIP):
+    ipList=[]
+    for ip in listIP:
+        resu=os.system("ping -c 1 -W 1 " + listIP[ip]+" >/dev/null")
+    	if resu == 0:
+            ipList.append(ipTest)
+    return ipList
